@@ -7,7 +7,6 @@ from PIL import Image
 import math
 
 def processVision(ob):
-  
   newOb = ob[0]['vision']
   img = newOb[86:386, 20:520, ::-1]
   output = img[:,:,::-1]
@@ -21,26 +20,27 @@ def processVision(ob):
   # ret, img = cv2.threshold(img, 80, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
   
   # add map/score mask
-  cv2.circle(img, (435, 235), 45, (0,0,0), -1)
+  cv2.circle(output, (435, 235), 45, (0,0,0), -1)
   cv2.rectangle(img, (10, 260), (120, 300), (0,0,0), -1)
 
   return img, output
 
-def findMass(img, output):
+def findMass(img, output, visDict):
   # find mass cirlces
   circles = cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 1,
                 param1 = 10, param2 = 10, minRadius = 0, maxRadius = 5)
   if circles is not None:
     circles = np.uint16(np.around(circles))
     for i in circles[0, :]:
+      visDict[(i[0]//5, i[1]//5)] = 'M'
       cv2.circle(output, (i[0],i[1]), i[2], (0,255,0), 2)    #mark mass with green circle
       cv2.circle(img, (i[0],i[1]), i[2] + 1, (0,0,0), -1)    #mask mass found
       # cv2.imshow('circles', output)
 
 
-def findSnakes(img, output, centerX, centerY):
+def findSnakes(img, output, visDict, centerX, centerY):
   # attempt to find your contour
-  img, contours, hierarchy = cv2.findContours(img,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
+  img, contours, hierarchy = cv2.findContours(img,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
   # cv2.drawContours(output, contours, -1, (255,0,0), 3)
   if contours is not None:
     close = 51
@@ -49,7 +49,23 @@ def findSnakes(img, output, centerX, centerY):
     for con in contours:
       M = cv2.moments(con)
       area = cv2.contourArea(con)
+      # smallest area for snek
       if (area > 120):
+        """
+        print ("con")
+        print (con)
+        print ("con[0]")
+        print (con[0])
+        print ("con[0][0]")
+        print (con[0][0])
+        # x,y level
+        print ("con[0][0][0]")
+        print (con[0][0][0])
+        """
+
+        for point in con:
+          visDict[(point[0][0]//5, point[0][1]//5)] = 'S'
+
         cv2.drawContours(output, con, -1, (0,0,255), 2)
         if (M["m00"] != 0):
           cX = int(M["m10"] / M["m00"])
@@ -58,11 +74,20 @@ def findSnakes(img, output, centerX, centerY):
         if (close < closestDist):
           closestDist = close
           closeCon = con
-        cv2.drawContours(output, closeCon, -1, (255,0,0), 3)
+    cv2.drawContours(output, closeCon, -1, (255,0,0), 3)
+    for point in closeCon:
+      visDict[(point[0][0]//5, point[0][1]//5)] = 'Y'
 
+
+def initDict(visDict):
+  # init dict
+  for x in range(100):
+    for y in range(60):
+      visDict[(x, y)] = 'B'
 
 def main():
 
+  visionDict = {}
   score = 10
   centerX = 250
   centerY = 150
@@ -71,21 +96,29 @@ def main():
   observation_n = env.reset()
   # print ('Size of array: {}'.format(np.shape(observation_n[0])))
   
+  # initDict(visionDict)
+  # print (visionDict)
+
   while True:
     if (observation_n[0] != None):
+      visionDict.clear()
+      # initDict(visionDict)
       # print (type(observation_n))
       # print (type(observation_n[0]))
       # print (observation_n)
       # print (observation_n[0])
       img, output = processVision(observation_n)
-      # cv2.imshow('gray', img)
+      cv2.imshow('gray', img)
 
-      findMass(img, output)
-   
+      findMass(img, output, visionDict)
+      # print (visionDict)   
+
       # make binary threshold for contours
       ret, img = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
+      # cv2.imshow('b&w', img)
 
-      findSnakes(img, output, centerX, centerY)
+      findSnakes(img, output, visionDict, centerX, centerY)
+      # print (visionDict)   
 
       cv2.imshow('all detected objects', output)
       cv2.waitKey(0)
