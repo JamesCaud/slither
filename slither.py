@@ -6,6 +6,7 @@ Using: OpenCV, OpenAI Gym/Universe, TensorFlow
 """
 
 import gym
+from gym import wrappers
 import universe 
 import numpy as np
 import cv2
@@ -69,14 +70,23 @@ Input: 	img: the grayscaled image to find circles on
 Output: point of biggest mass
 """
 def findMass(img, output, visDict):
-  bigMass = 0.0
+  bigMass = 1.0
   returnPoint = None
   # find mass cirlces with hough circles
   circles = cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 1,
                 param1 = 10, param2 = 10, minRadius = 0, maxRadius = 5)
   if circles is not None:				# if mass found
-    circles = np.uint16(np.around(circles))		# convert circles to np array
-    for i in circles[0, :]:				# loop through circles
+    circlesSorted = sorted(circles[0,:], key=lambda x: (x[2], 
+                           math.hypot(x[0]-250, x[1]-150)), reverse=True)
+    circle = circlesSorted[0]
+    returnPoint = (circle[0], circle[1])
+    visDict[(circle[0]//5, circle[1]//5)] = 'M'			# mark the mass in the vision dict
+    cv2.circle(output, (circle[0], circle[1]), circle[2], (0,255,0), 2)    	# mark mass with green circle
+
+  """
+    print (circlesSorted)
+    print ('\n')
+    for i in circles[0, :]:				# loop through circles 
       if (i[2] > bigMass):
         bigMass = i[2]
         returnPoint = (i[0], i[1])
@@ -84,8 +94,10 @@ def findMass(img, output, visDict):
       cv2.circle(output, (i[0],i[1]), i[2], (0,255,0), 2)    	# mark mass with green circle
       # cv2.circle(img, (i[0],i[1]), i[2] + 1, (0,0,0), -1)    	# mask mass found
       # cv2.imshow('circles', output)			# show user the circles found
-
+  """
+  
   return returnPoint
+
 
 
 """
@@ -161,6 +173,7 @@ def main():
   centerY = 150		# init the center Y (for small screen)
   # make slither with no skins (also no top ten list)
   env = gym.make('internet.SlitherIONoSkins-v0')
+  # env = wrappers.Monitor(env, 'tmp/slither-test-1')
   env.configure(remotes=1)  	# automatically creates a local docker container
   observation_n = env.reset()	# start the the game (pretty much)
   
@@ -185,12 +198,13 @@ def main():
       findSnakes(img, output, visionDict, centerX, centerY)
       # print (visionDict)   
 
-      pointer = findDeadMass(img2, output, visionDict)		# find dead mass on screen
+      pointer = findDeadMass(img2, output, visionDict)# find dead mass on screen
       if (pointer != None):
         mouse = pointer
         mouseClick = 1
       else:
         mouseClick = 0
+        pass
 
       # cv2.imshow('all detected objects', output)	# show user everythang
       # cv2.waitKey(0)					# WAIT
@@ -202,8 +216,11 @@ def main():
 
 
     # TODO: decision making
-    action_n = [[('PointerEvent', newX, newY, mouseClick)] for ob in observation_n]  # your agent here
+    action_n = [[('PointerEvent', newX, newY, mouseClick)] for ob in observation_n]
     observation_n, reward_n, done_n, info = env.step(action_n)
+    # if (done_n[0]):
+    #   env.close()
+    #   return
     if (reward_n[0] != 0):		# if your snake ate mass
       score = score + reward_n[0] 	# update score
       print (reward_n)			# print what you ate
