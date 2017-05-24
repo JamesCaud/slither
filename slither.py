@@ -44,7 +44,8 @@ def processVision(ob):
   newOb = ob[0]['vision']		# yank the 3d numpy vision array
   img = newOb[86:386, 20:520, ::-1]	# img is what the cv operations will be on
   img2 = img				# img2 for dead mass cv operations
-  output = img[:,:,::-1]		# ouput is for printing results onto
+  output = img[:,:,::-1]				# ouput is for printing results onto
+  cv2.imshow('initial image', output)
  
   img = cv2.GaussianBlur(img,(5,5),0)	# blur for rounded cirlces
   img2 = cv2.GaussianBlur(img2,(5,5),0)	# blur for rounded cirlces
@@ -80,8 +81,10 @@ def findMass(img, output, visDict):
                            math.hypot(x[0]-250, x[1]-150)), reverse=True)
     circle = circlesSorted[0]
     returnPoint = (circle[0], circle[1])
-    visDict[(circle[0]//5, circle[1]//5)] = 'M'			# mark the mass in the vision dict
-    cv2.circle(output, (circle[0], circle[1]), circle[2], (0,255,0), 2)    	# mark mass with green circle
+    for i in circles[0, :]:
+      visDict[(i[0]//5, i[1]//5)] = 'M'				# mark the mass in the vision dict
+      cv2.circle(output, (i[0], i[1]), i[2], (0,255,0), 2)   	# mark mass with green circle
+    cv2.circle(output, (circle[0], circle[1]), circle[2], (0,255,255), 2)   	
 
   """
     print (circlesSorted)
@@ -140,8 +143,8 @@ def findSnakes(img, output, visDict, centerX, centerY):
   # find contours in the image (snakes and big overlapping mass)
   img, contours, hierarchy = cv2.findContours(img,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
   if contours is not None:		# if there are contours found
-    close = 51				# sorta abritrary close value
-    closestDist = 50			# definitely arbitrary
+    close = 50				# sorta abritrary close value
+    closestDist = 100			# definitely arbitrary
     closeCon = contours[0]		# just pick a close contour
     for con in contours:		# loop through all contours
       M = cv2.moments(con)		# take the moments for the contour
@@ -181,24 +184,26 @@ def main():
     if (observation_n[0] != None):			# if the game is live
       visionDict.clear()				# clear the dict for new objects
       img, img2, output = processVision(observation_n)	# process the pixels
-      # cv2.imshow('gray', img)				# show user grayscaled
-      # cv2.imshow('higher threshold', img2)		# show user high threshold
+      cv2.imshow('grayscaled with masks', img)		# show user grayscaled
 
       pointer = findMass(img, output, visionDict)	# find the mass (dots)
+      cv2.imshow('mass found', output)
       if (pointer != None):
         mouse = pointer
 
       # make binary threshold for contours
       ret, img = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
       ret, img2 = cv2.threshold(img2, 5, 255, cv2.THRESH_BINARY)
-      # cv2.imshow('b&w', img)				# show user black and white
-      # cv2.imshow('b&w2', img2)				# show user black and white
+      cv2.imshow('black and white for snakes', img)	# show user black and white
+      cv2.imshow('black and white for dead mass', img2)	# show user black and white
 
       # find sneks
       findSnakes(img, output, visionDict, centerX, centerY)
       # print (visionDict)   
+      cv2.imshow('snakes found', output)
 
-      pointer = findDeadMass(img2, output, visionDict)# find dead mass on screen
+      pointer = findDeadMass(img2, output, visionDict)	# find dead mass on screen
+      cv2.imshow('dead mass found', output)
       if (pointer != None):
         mouse = pointer
         mouseClick = 1
@@ -206,9 +211,9 @@ def main():
         mouseClick = 0
         pass
 
-      # cv2.imshow('all detected objects', output)	# show user everythang
-      # cv2.waitKey(0)					# WAIT
-      # cv2.destroyAllWindows()				# DESTROY			
+      cv2.imshow('all detected objects', output)	# show user everythang
+      cv2.waitKey(0)					# WAIT
+      cv2.destroyAllWindows()				# DESTROY			
     else:
       score = 10 					# reset score
 
